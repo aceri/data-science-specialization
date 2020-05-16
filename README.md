@@ -24,13 +24,25 @@
 
 - Github Repository: [Exploratory Analysis of Environmental Protection Agency Data on Air Standards](https://github.com/aceri/data-science-specialization/tree/master/exploratory-data-analysis/course_project2)
 
+## Course 5. Reproducible Research
+
+#### Peer-graded Assignment W4: Study of Storm and Severe Weather Events
+
+- Github Repository: [Study of Storm and Severe Weather Events](https://github.com/aceri/data-science-specialization/tree/master/reproducible_research/StormData)
+
 ## Course 6. Statistical Inference
 
 #### Peer-graded Assignment W4: Exponential Distribution and Central Limit Theorem and Inference Data Analysis
 
 - Github Repository: [Exponential Distribution and Central Limit Theorem and Inference Data Analysis](https://github.com/aceri/data-science-specialization/tree/master/statistical_inference)
 
-## Course 9. Practical Machine Learning
+## Course 7. Regression Models
+
+#### Peer-graded Assignment W4: Motor Trend - MPG & Transmission Analysis
+
+- Github Repository: [Generated PDF file](https://aceri.github.io/data-science-specialization/regression-models/motor_trend.pdf)
+
+## Course 8. Practical Machine Learning
 
 #### Peer-graded Assignment W4: Prediction Assignment 
 
@@ -41,7 +53,7 @@ https://github.com/aceri/data-science-specialization/tree/master/practical-machi
 - Web Output in Github Pages (Same as RPubs): https://aceri.github.io/practical-machine-learning/w4project/RPubs%20-%20Human%20Activity%20Recognition%20using%20Wearable%20Sensors.html
 
 
-## Course 10. Developing Data Products
+## Course 9. Developing Data Products
 
 #### Peer Graded Assignment W3: RMarkdown
 [Forecast on COVID-19 Confirmed, Deceased and Deceased/Confirmed Cases Rate](https://rpubs.com/dpellon/614828)
