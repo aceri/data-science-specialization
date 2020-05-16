@@ -1,0 +1,106 @@
+---
+title: "Yahoo Finance Visualizer"
+author: "David Pellon"
+date: "16/5/2020"
+output: ioslides_presentation
+font-import: http://fonts.googleapis.com/css?family=Risque
+font-family: 'Risque'
+
+---
+
+
+```{css echo=FALSE}
+<style>
+slides > slide.title-slide p { color: darkred;}
+slides > slide.title-slide hgroup h1 { color: darkred;}
+slides > slide hgroup h2 { color: darkred;}
+</style>
+```    
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(cowsay)
+
+```
+
+## Introduction {.smaller}
+
+This presentation made with slidify is the second part of the 4th Week Assignment 
+for the Coursera's *Developing Data Products* Course from the 
+*Data Science Specialization*.
+
+In the first part of the Assignment, I have created the shinyapp named
+*Yahoo Finance Visualizer*. You can find it on url below:
+
+
+https://dpellon.shinyapps.io/Yahoo_Finance_Visualizer/
+
+
+The application allows to basically display Stock Instruments from Yahoo Finance
+with some configuration options.
+
+Next slides will provide further information on the details.
+
+
+## Example Chart {.smaller}
+
+You can get instrument historic price evolution as can see below for AAPL
+
+
+```{r, comment ="", echo=FALSE, fig.align='center',message=F,warning=FALSE} 
+
+plot_chart<-function(symb,mon,type,period,MA_type,MA_col)
+{
+require(quantmod)
+require(mondate)
+
+    get_data<-function(symb,mon)
+    {
+        ret <- getSymbols(symb,src="yahoo",auto.assign=F,from=Sys.Date()-mon,to=Sys.Date())
+        return(ret)
+    }
+    chart_type <- function(type)
+    {
+         if(type=="1"){ret <- "candlesticks"}
+         else if(type=="2"){ret <- "matchsticks"}
+         else if(type=="3"){ret <- "bars"}
+         else if(type=="4"){ret <- "line"}
+         return(ret)
+    }
+    chartSeries(get_data(symb,mon),
+                type = chart_type(type), 
+                theme = chartTheme("black"),
+                name=toupper(symb),
+                up.col="green",
+                dn.col="red")
+
+}
+plot_chart('AAPL',365,'1',20,1,"red")
+```
+
+## Configuration Options {.smaller}
+
+
+- It is possible to specify different types of Moving Averages, their colours and configuration periods. Types are: 
+     - SMA
+     - EMA
+     - WMA
+     - EVWMA
+     - ZLEMA
+     
+- You can also switch between different types of standard financial charts : 
+     - Candlesticks
+     - Matchsticks
+     - Bars
+     - Line
+
+
+## Example of different configurations {.smaller}
+
+
+```{r, comment ="", echo=FALSE, fig.align='center'} 
+knitr::include_graphics("pic.jpg")
+
+```

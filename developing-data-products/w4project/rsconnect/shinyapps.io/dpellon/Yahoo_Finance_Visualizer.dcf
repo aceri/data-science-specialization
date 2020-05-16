@@ -1,0 +1,13 @@
+name: Yahoo_Finance_Visualizer
+title: Yahoo_Finance_Visualizer
+username:
+account: dpellon
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2309405
+bundleId: 3154696
+url: https://dpellon.shinyapps.io/Yahoo_Finance_Visualizer/
+when: 1589624732.61859
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: data/covid_df.rds
