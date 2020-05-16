@@ -6,6 +6,9 @@
 
 #### Peer Graded Assignment W3: Lexical Scoping
 
+Github Repository
+- [Lexical Scoping](https://github.com/aceri/data-science-specialization/tree/master/r-programming/w3project)
+
 
 ## Course 9. Practical Machine Learning
 
