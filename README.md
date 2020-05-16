@@ -2,9 +2,9 @@
  
 ## Projects and assignments from the Data Science Specialization:
 
-### 9. Practical Machine Learning
+### Course 9. Practical Machine Learning
 
-#### Week 4 Peer-graded Assignment: Course Project: Prediction Assignment 
+#### Peer-graded Assignment W4: Course Project: Prediction Assignment 
 
 Github Repository (Everything is here):
 https://github.com/aceri/data-science-specialization/tree/master/practical-machine-learning/w4project
@@ -13,11 +13,11 @@ https://github.com/aceri/data-science-specialization/tree/master/practical-machi
 - Web Output in Github Pages (Same as RPubs): https://aceri.github.io/practical-machine-learning/w4project/RPubs%20-%20Human%20Activity%20Recognition%20using%20Wearable%20Sensors.html
 
 
-### 10. Developing Data Products
+### Course 10. Developing Data Products
 
-#### 1- Week 3 Peer Graded Assignment: Course Project
+#### Peer Graded Assignment W3: Course Project
 [Forecast on COVID-19 Confirmed, Deceased and Deceased/Confirmed Cases Rate](https://rpubs.com/dpellon/614828)
-#### 2- Week 4 Peer Graded Assignment: Course Project: Shiny Application & Reproducible Pitch
+#### Peer Graded Assignment W4: Course Project: Shiny Application & Reproducible Pitch
 ##### Shiny Application
 - [Yahoo Finance Visualizer ShinyApp (ShinyApps hosted)](https://dpellon.shinyapps.io/Yahoo_Finance_Visualizer/)
 ##### Reproducible Pitch Presentation
