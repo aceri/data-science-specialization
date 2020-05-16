@@ -6,9 +6,17 @@
 
 #### Peer Graded Assignment W3: Lexical Scoping
 
-Github Repository
-- [Lexical Scoping](https://github.com/aceri/data-science-specialization/tree/master/r-programming/w3project)
+- Github Repository [Lexical Scoping](https://github.com/aceri/data-science-specialization/tree/master/r-programming/w3project)
 
+## Course 4. Exploratory Data Analysis
+
+#### Peer-graded Assignment W1: Exploratory Analysis of Electric Power Consumption Data
+
+- Github Repository: [Exploratory Analysis of Electric Power Consumption Data](https://github.com/aceri/data-science-specialization/tree/master/exploratory-data-analysis/course_project1)
+
+#### Peer-graded Assignment W4: Exploratory Analysis of Environmental Protection Agency Data on Air Standards
+
+- Github Repository: [Exploratory Analysis of Environmental Protection Agency Data on Air Standards](https://github.com/aceri/data-science-specialization/tree/master/exploratory-data-analysis/course_project2)
 
 ## Course 9. Practical Machine Learning
 
