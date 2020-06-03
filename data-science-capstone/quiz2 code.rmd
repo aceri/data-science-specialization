@@ -1,0 +1,765 @@
+---
+title: "Milestone Report - Text Mining"
+author: "David Pellon"
+date: "26/5/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libs_and_functions, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis'}
+str_detect
+library(qdapDictionaries)
+library(cld2)
+library(stopwords)
+library(tidytext)
+library(tidyr)
+library(dplyr)
+library(quanteda)
+library(tm)
+library(stringi)
+library(cowplot)
+library(stringr)
+library(ggplot2)
+library(scales)
+library(Hmisc)
+library(wordcloud)
+
+require(googleVis)
+op <- options(gvis.plot.tag='chart')
+
+
+sample_Corpus <- function(file_str,pct) { 
+    nam <- names(file_str)
+    k <- file_str[sample(1:length(file_str),round(length(file_str)*pct,0))] 
+    names(k) <- nam
+    return(k)
+}
+
+
+clean_line <- function(line,min_chars=1,filter_stop_words=F,return_words=F)
+{
+    require(stopwords)
+    line %>% tibble() %>% tolower() %>% gsub("[[:digit:]]","",.) %>% gsub("(.)\\1{2,}","",.) %>% gsub("[^abcdefghijklmnopqrstuvwxyz' ]+","",.) %>% gsub("^[ ']+|[ ']$+","",.) %>% gsub(" +"," ",.)  -> line
+    words <- unlist(stri_split_regex(line," "))
+    if (min_chars > 1) words <- words[nchar(words) >= min_chars]
+    if (filter_stop_words==T) words <- words[!(words %in% stopwords::stopwords(language="en",source="stopwords-iso"))]
+    if (return_words==T) {ret <- words } else { ret <- gsub(", "," ",toString(words))}
+    return(ret)
+}
+
+clean_text <- function(text_tibble, min_chars=1, filter_stop_words=F)
+{
+    # Needs a tibble of the text with each line being in a column txt
+    text <- text_tibble
+    for (k in 1:nrow(text))
+    {
+        text[k,1] <- clean_line(text[k,1],min_chars = min_chars,filter_stop_words = filter_stop_words , return_words = F)
+    }
+    return(text)
+}
+
+
+analyze_text_with_qdapdictionary <- function(set_of_file_url_str, filter_lines_with_regexp="", filter_words_with_regexp="", 
+                                               min_chars=1, filter_stop_words=F,verbose=F, use_sample=F, use_lines_pct=0, rated_output=T){
+    require(stringi)
+    max_line_length_in_text_file <- function(file_url_str)
+    {
+        tmptxt <- readLines(con <- file(file_url_str,open="r"),skipNul=T,warn=F)
+        tmptxt<-tmptxt[!is.na(tmptxt)]
+        close(con)
+        num_rows <- length(tmptxt)
+        file_max_length <- 0
+        for (k in 1:num_rows) 
+        {
+            this_line_length <- nchar(tmptxt[k])
+            if (this_line_length > file_max_length) file_max_length <- this_line_length
+        }
+        return(file_max_length)
+    }
+    number_of_lines_with_regexp <- function(file_url_str, regexp_str)
+    {
+        require(stringr)
+        tmptxt <- readLines(con <- file(file_url_str,open="r"),skipNul=T,warn=F)
+        tmptxt<-tmptxt[!is.na(tmptxt)]
+        close(con)
+        return(length(tmptxt[str_detect(tmptxt,regexp_str)]))
+    }
+    
+
+    filter_line_in_file_with_regexp <- function(file_url_str, regexp_str)
+    {
+        require(stringr)
+        tmptxt <- readLines(con <- file(file_url_str,open="r"),skipNul=T,warn=F)
+        tmptxt<-tmptxt[!is.na(tmptxt)]
+        
+        close(con)
+        return(tmptxt[str_detect(tmptxt,regexp_str)])
+    }    
+    
+    is.word  <- function(x) x %in% c(GradyAugmented)
+    is.abbreviation  <- function(x) x %in% c(abbreviations)
+    is.action.verb  <- function(x) x %in% c(action.verbs)
+    is.emoticon  <- function(x) x %in% c(emoticon)
+    is.interjection  <- function(x) x %in% c(interjections)
+    is.firstname  <- function(x) x %in% c(NAMES)
+    is.negation.words  <- function(x) x %in% c(negation.words)
+    is.negative.words  <- function(x) x %in% c(negative.words)
+    is.positive.words  <- function(x) x %in% c(positive.words)
+    is.preposition  <- function(x) x %in% c(preposition)
+    is.strong.words  <- function(x) x %in% c(strong.words)
+    is.submit.words  <- function(x) x %in% c(submit.words)
+    is.weak.words  <- function(x) x %in% c(weak.words)
+    
+    base_analyze <- function(file_url_str,filter_lines_with_regexp="",filter_words_with_regexp="",
+                              verbose=F,use_sample=T,use_lines_pct=0.05,rated_output=T,min_chars=1,filter_stop_words=F){
+        txt <- filter_line_in_file_with_regexp(file_url_str=file_url_str, regexp_str=filter_lines_with_regexp)
+        total_words=0;total_abbreviation=0;total_action.verb=0;total_interjection=0;
+        total_negative.words=0;total_positive.words=0;total_preposition=0;total_strong.words=0
+        total_weak.words=0;total_english=0;total_french=0;total_dutch=0;total_spanish=0;total_german=0
+        total_italian=0;counter=0
+        num_lines <- number_of_lines_with_regexp(file_url_str,regexp_str="")
+        if (verbose==T) print(paste("analyze_text_with_qdapdictionary > ",basename(file_url_str)," :: Total number of rows for this file = ",num_lines,sep=""))
+        if (use_sample ==T & use_lines_pct >0) {
+            num_lines <- round(num_lines*use_lines_pct,0)
+            if (verbose==T) print(paste("analyze_text_with_qdapdictionary > ",basename(file_url_str)," :: Using ",use_lines_pct*100,"% of lines (",num_lines,") and prorated output",sep=""))}
+        for (j in 1:num_lines)
+        {
+            if (use_sample ==T & use_lines_pct >0) j <- sample(1:num_lines,1)
+            this_line <- txt[j]
+            #wil <- words_in_a_line(this_line,min_chars=1,filter_stop_words = F,clean_str = T)
+            wil <- clean_line(this_line,min_chars=min_chars,filter_stop_words = filter_stop_words,return_words=T)
+            # if(j!=14877) {
+                total_words=total_words+length(wil)
+                for (k in 1:length(wil)) 
+                {
+                    if (!is.na(wil[k]) & !is.null(wil[k]))
+                    {
+                        this_word <- wil[k]
+                        if (is.abbreviation(this_word)) total_abbreviation=total_abbreviation+1
+                        if (is.action.verb(this_word)) total_action.verb=total_action.verb+1
+                        if (is.interjection(this_word)) total_interjection=total_interjection+1
+                        if (is.negative.words(this_word)) total_negative.words=total_negative.words+1
+                        if (is.positive.words(this_word)) total_positive.words=total_positive.words+1
+                        if (is.preposition(this_word)) total_preposition=total_preposition+1
+                        if (is.strong.words(this_word)) total_strong.words=total_strong.words+1
+                        if (is.weak.words(this_word)) total_weak.words=total_weak.words+1
+                    } else {if (verbose==T) print(paste("analyze_text_with_qdapdictionary > ",basename(file_url_str),
+                                                        " :: counter : ",counter," line(j) : ",j," word(k) : ",k," = ",
+                                                        toString(this_word)," line length :",length(wil[k])," line : ",
+                                                        toString(this_line),sep=""))}
+                    
+                }
+                detect <- cld2::detect_language(this_line)
+                if (!is.na(detect))
+                {
+                     if (detect=="en") total_english=total_english+1
+                     if (detect=="fr") total_french=total_french+1
+                     if (detect=="de") total_german=total_german+1
+                     if (detect=="es") total_spanish=total_spanish+1
+                     if (detect=="it") total_italian=total_italian+1
+                }
+                counter=counter+1
+                if (verbose==T & (counter %% round(num_lines/4,0) == 0)) {print(paste("analyze_text_with_qdapdictionary > ",basename(file_url_str)," :: Lines ",counter, " of ",num_lines," processed",sep=""))}
+            # }
+        }
+        if (use_lines_pct>0 & rated_output==T) {r <- (1/use_lines_pct) } else {r=1}
+        ret=rbind(c(round(r*total_words,0), round(r*total_abbreviation,0), round(r*total_action.verb,0),round(r*total_interjection,0), round(r*total_negative.words,0),
+                    round(r*total_positive.words,0),round(r*total_preposition,0), round(r*total_strong.words,0),round(r*total_weak.words,0), round(r*total_english,0),
+                    round(r*total_french,0), round(r*total_german,0), round(r*total_spanish,0), round(r*total_italian,0)))
+        return(ret)
+    }
+
+    WeekDays_regexp="[sS]unday|[mM]onday|[tT]uesday|[wW]ednesday|[tT]hursday|[fF]riday|[sS]aturday"
+    Month_regexp="[jJ]anuary|[fF]ebruary|[mM]arch|[aA]pril|[mM]ay|[jJ]une|[jJ]uly|[aA]ugust|[sS]eptember|[oO]ctober|[nN]ovember|[dD]ecember"
+    Color_regexp="[rR]ed|[yY]ellow|[gG]reen|[bB]lue|[wW]hite|[bB]lack|[gG]ray|[gG]rey|[oO]range|[pP]ink|[bB]rown|[pP]urple|[cC]yan"
+
+    analysis_df<-data.frame(Observations=c("Filename                  ","Max Line Length           ","Total Lines               ","Total Words               ",
+                           "Rate Words / Lines        ","Total Abbreviations       ","Total Action Verbs        ","Total Interjection        ",
+                           "Total Negative Words      ","Total Positive Words      ","Total Prepositions        ","Total Strong Words        ",
+                           "Total Weak Words          ","Total Lines in English    ","Total Lines in French     ","Total Lines in German     ",
+                           "Total Lines in Spanish    ","Total Lines in Italian    ","Lines including a Weekday ","Lines including a Month   ",
+                           "Lines including a Color   "))
+
+    for(k in 1:length(set_of_file_url_str)) 
+    {
+        this_file_url <- set_of_file_url_str[k]
+        stats <- base_analyze(file_url_str=this_file_url,"","",verbose=verbose,use_sample=use_sample,use_lines_pct=use_lines_pct,rated_output=rated_output,min_chars=min_chars,filter_stop_words=filter_stop_words)
+        total_lines <- number_of_lines_with_regexp(this_file_url,"")    
+        analysis_df <- cbind(analysis_df,data.frame(X=
+            c(
+                basename(this_file_url),
+                max_line_length_in_text_file(this_file_url),
+                total_lines,
+                stats[1],round(stats[1]/total_lines,2),stats[2],stats[3],stats[4],stats[5],stats[6],stats[7],
+                stats[8],stats[9],stats[10],stats[11],stats[12],stats[13],stats[14],
+                number_of_lines_with_regexp(this_file_url,WeekDays_regexp),
+                number_of_lines_with_regexp(this_file_url,Month_regexp),
+                number_of_lines_with_regexp(this_file_url,Color_regexp)
+            )))
+        names(analysis_df)[dim(analysis_df)[2]] <- paste("File_",ifelse(k<10,paste("0",k,sep=""),k),sep="")
+    }
+    return(analysis_df)
+}
+
+Top_N_words <- function(file_tibble,top=10,min_chars=1,filter_stop_words=F)
+{
+    file_tibble %>% clean_text(min_chars=min_chars,filter_stop_words=filter_stop_words) %>% unnest_tokens(word,txt) %>%
+    count(word,sort=TRUE) %>% arrange(desc(n)) %>%
+    mutate(word=reorder(word,n)) -> ret
+    if (top>0) ret <- head(ret,top)
+    return(ret)
+}
+
+
+
+pct_lines_needed_for_N_pct_freq_instances <- function(text_tibble, min_chars=1, filter_stop_words=F,N_pct_freq_instances=0.5)
+{
+    desired_pct <- N_pct_freq_instances
+    dict <- Top_N_words(file_tibble=text_tibble ,top=0,min_chars=min_chars,filter_stop_words=filter_stop_words) 
+    total_word_instances <- sum(dict$n)
+    last_col <- dim(dict)[2]
+    dict[1,last_col+1] <- dict$n[1]
+    dict[1,last_col+2] <- 1
+    names(dict)[last_col+1]  <- c("summat_n")
+    names(dict)[last_col+2] <- c("idx")
+    for (k in 2:dim(dict)[1]) {
+        dict[k,last_col+1] <- dict[k-1,last_col+1]+dict$n[k]
+        dict[k,last_col+2] <- k }   
+    return(min(dict$idx[dict$summat_n/total_word_instances>desired_pct])/nrow(dict))
+}
+
+calculate_needed_lines <- function(repeat_N_times=500,min_chars=4,filter_stop_words=T)
+{
+    if (file.exists("needed_lines_df.rds")) {
+        needed_lines_df <- readRDS("needed_lines_df.rds")
+    } else
+    {
+    needed_lines_df <- data.frame(percent_corpus_used=integer(),
+                                  percent_line_instances=numeric(),
+                                  percent_lines_required=numeric(),
+                                  seconds=numeric(),
+                                  abs_pct_req=numeric(),
+                                  abc_pct_used=numeric(),
+                                  stringsAsFactors = F)
+    
+    for (a in 1:repeat_N_times)
+    {
+        percent_corpus_used <- sample(0.5:4,1)/100
+        start_time <- Sys.time()
+        text_tibble <- all_dat[sample(1:nrow(all_dat),
+                            round(nrow(all_dat)*percent_corpus_used,0)),]
+        percent_line_instances <- sample(5:95,1)/100
+        percent_lines_required <- pct_lines_needed_for_N_pct_freq_instances(text_tibble=text_tibble, 
+                        min_chars=min_chars, filter_stop_words=filter_stop_words,
+                        N_pct_freq_instances=percent_line_instances)
+        end_time <- Sys.time()
+        seconds = end_time-start_time
+        abs_pct_req = percent_corpus_used * percent_line_instances
+        abs_pct_used = percent_corpus_used * percent_lines_required
+        needed_lines_df <- rbind(needed_lines_df,c(percent_corpus_used,
+                                                   percent_line_instances,
+                                                   percent_lines_required,
+                                                   seconds,
+                                                   abs_pct_req,
+                                                   abs_pct_used))
+        
+        names(needed_lines_df) <- c("percent_corpus_used",
+                                    "percent_line_instances",
+                                    "percent_lines_required",
+                                    "seconds",
+                                    "abs_pct_req",
+                                    "abs_pct_used")
+        
+        print(paste("Filled needed_lines_df - iteration : ",a," of ",
+                    repeat_N_times," - ",toString(needed_lines_df[a,]),sep=""))
+    }
+    saveRDS(needed_lines_df,"needed_lines.df")
+    }
+    return(needed_lines_df)
+}
+
+```
+
+
+## Milestone Report - Text Mining
+
+
+
+### 1. Synopsis
+
+
+
+As Capstone Project for the Course John Hopkins' Data Specialization Courses, I intend to prepare a text mining application.
+
+
+The application will: 
+
+- Load a large volume of text from different sources into a Corpora.
+- Process, clean the data and remove stop words as needed.
+- Create an algorithm that is able to predict next words based on previous given text like the utility some writing mobile applications provide to improve writing speed.
+
+
+This project is based on SwiftKey data, one of the first and most important companies providing such techonology.
+
+
+
+### 2. Data Processing
+
+
+
+The data consists in three Corpus txt files with different estructures:
+
+
+- en_US.blogs.txt    - A collection of blog paragraphs.
+- en_US.news.txt     - A collection of news paragraphs.
+- en_US.twitter.txt  - A collection of tweets.
+
+
+
+Let's display some raw rows of each Corpus :
+
+
+```{r inits_and_samples, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+folder <- "./Coursera-SwiftKey/final/en_US/"
+
+blogs_str   <- paste(folder,"en_US.blogs.txt"   ,sep="")
+news_str    <- paste(folder,"en_US.news.txt"    ,sep="")
+twitter_str <- paste(folder,"en_US.twitter.txt" ,sep="")
+
+
+use_pct=0.05
+
+blogs_dat   <- scan(blogs_str,"character",sep="\n",skipNul = T)
+news_dat    <- scan(news_str,"character",sep="\n",skipNul = T)
+twitter_dat <- scan(twitter_str,"character",sep="\n",skipNul = T)
+
+news_sample_dat    <- sample_Corpus(news_dat,use_pct)
+blogs_sample_dat   <- sample_Corpus(blogs_dat,use_pct)
+twitter_sample_dat <- sample_Corpus(twitter_dat,use_pct) 
+
+corpora_set <- c(twitter_str, blogs_str, news_str)
+
+sample_n <- data.frame(news_sample_dat[1:5])
+names(sample_n)<-c("Random 5 rows Sample en_US.news.txt [Raw]")
+sample_b <- data.frame(blogs_sample_dat[1:5])
+names(sample_b)<-c("Random 5 rows Sample en_US.blogs.txt [Raw]")
+sample_t <- data.frame(twitter_sample_dat[1:5])
+names(sample_t)<-c("Random 5 rows Sample en_US.twitter.txt [Raw]")
+
+p_sample_n <- gvisTable(sample_n)
+p_sample_b <- gvisTable(sample_b)
+p_sample_t <- gvisTable(sample_t)
+
+p_samples <- gvisMerge(p_sample_n,p_sample_b,horizontal=F)
+plot(gvisMerge(p_samples,p_sample_t,horizontal=F))
+
+```
+
+
+
+### 3. Summary Statistics
+
+
+
+
+#### Corpus Comparison Table
+
+
+
+Let's create a comparison table with some basic statistics found in each Corpus
+
+
+This time considering the minimum allowable characters as one and not filtering stop words
+
+
+```{r analysis1, echo=F,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+analysis1 <- analyze_text_with_qdapdictionary(set_of_file_url_str=corpora_set, 
+                                             filter_lines_with_regexp="", filter_words_with_regexp="", 
+                                             min_chars=1, filter_stop_words=F,
+                                             verbose=F, use_sample=T, use_lines_pct=use_pct, rated_output=T)
+plot(gvisTable(analysis1))
+
+
+```
+
+
+#### 4. Word Frequency for each Corpus
+
+Word frequency is an important asset in order to predict future words as we intend to do. .
+
+This section displays a comparison of each Corpus Word Frequency
+
+```{r top_N_words1, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis'}
+
+d_all <- rbind(tibble(txt=news_sample_dat),
+               tibble(txt=blogs_sample_dat),
+               tibble(txt=twitter_sample_dat))
+
+d_news <- tibble(txt=news_sample_dat)
+d_blogs <- tibble(txt=blogs_sample_dat)
+d_twitter <- tibble(txt=twitter_sample_dat)
+
+tidy_all <- Top_N_words(d_all ,top=20,min_chars=1,filter_stop_words=F)
+tidy_news <- Top_N_words(d_news ,top=20,min_chars=1,filter_stop_words=F)
+tidy_blogs <- Top_N_words(d_blogs ,top=20,min_chars=1,filter_stop_words=F)
+tidy_twitter <- Top_N_words(d_twitter ,top=20,min_chars=1,filter_stop_words=F)
+
+p1<-tidy_all %>% 
+    ggplot(aes(word,n*1/use_pct)) +
+    geom_col() + xlab("Top Word Repetition Frequency") +
+    ggtitle(paste("Corpora Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) +
+    coord_flip() 
+
+p2<-tidy_news  %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'news' Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+p3<-tidy_blogs %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'blogs' Top Word Repetition Frecuency  [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+p4<-tidy_twitter %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'twitter' Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+plot_grid(p1,p2,p3,p4,ncol=2,nrow=2,align="hv")
+
+```
+
+In the following charts we specify a limit in the minimum number of characters we allow for words (4) and filtering out stop words.
+
+
+```{r top_N_words2, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+tidy_all     <- Top_N_words(d_all ,top=20,min_chars=4,filter_stop_words=T)
+tidy_news    <- Top_N_words(d_news ,top=20,min_chars=4,filter_stop_words=T)
+tidy_blogs   <- Top_N_words(d_blogs ,top=20,min_chars=4,filter_stop_words=T)
+tidy_twitter <- Top_N_words(d_twitter ,top=20,min_chars=4,filter_stop_words=T)
+
+p1<-tidy_all %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + xlab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpora Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip() 
+
+p2<-tidy_news  %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'news' Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+p3<-tidy_blogs %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'blogs' Top Word Repetition Frecuency  [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+p4<-tidy_twitter %>% 
+    ggplot(aes(word,n*1/use_pct)) + 
+    geom_col() + ylab("Top Word Repetition Frequency") + 
+    ggtitle(paste("Corpus 'twitter' Top Word Repetition Frecuency [",
+            use_pct*100,"% sampling prorated]",sep="")) + 
+    coord_flip()
+
+plot_grid(p1,p2,p3,p4,ncol=2,nrow=2,align="hv")
+
+```
+
+
+### 5. Estimating the Number of Lines to Load from the Corpora.
+
+
+
+An important issue is the size of the corpora. We might not need to use every single line .
+
+
+The amount of data required to sample to obtain meaningful predictions is an important factor if we want to use the prediction model under limited time and processing constraints.
+
+
+What percent of lines do we need to obtain the N % of the instances of words in the corpora ?
+
+
+
+##### Some Examples :
+
+
+-  What percent to obtain 50% of word instances of news corpus with a minimum of 3 characters per word and using stop words ?
+
+
+```{r x1, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+
+round(100*pct_lines_needed_for_N_pct_freq_instances(text_tibble=d_news, min_chars=3, filter_stop_words=T,N_pct_freq_instances=0.5),2) 
+
+
+```
+
+-  What percent to obtain 90% of word instances of news corpus with a minimum of 1 characters per word and not using stop words ?
+
+
+
+```{r x2, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+
+round(100*pct_lines_needed_for_N_pct_freq_instances(text_tibble=d_news, min_chars=1, filter_stop_words=F,N_pct_freq_instances=0.9),2) 
+
+
+``` 
+
+
+In order to establish which percent of the lines of the corpora would maximize the time, entropy information pair we will create a function to randomly select a number of maximum lines to use from the corpora and a random desired percent value that would be covered by the sum of the top N word repetitions respect the total of the corpora.
+
+
+
+```{r needed_lines1, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+needed_lines_df <- calculate_needed_lines(repeat_N_times = 500,
+                                          min_chars = 4,
+                                          filter_stop_words = T)
+
+needed_lines_df$percent_corpus_loaded <-cut2(needed_lines_df$percent_corpus_used,g=4)
+
+qq <- qplot(x=percent_line_instances,
+            y=percent_lines_required,
+            data=needed_lines_df,
+            colour=factor(percent_corpus_loaded),
+            ylim=c(0,1),geom=c("point"),
+            xlab="% Word Instances",
+            ylab="% lines of Corpus Needed",
+            main="Ratio of % lines of Corpus Needed for % Word Instances")
+
+qq + geom_smooth(method="lm",formula=y~exp(x^3),se=F)
+
+
+```
+
+
+
+Loading more lines from the corpus brings certainty although with the added time and computing resources.
+
+
+What is the ratio of "% Lines of Corpus Needed" respect to "% Lines of Corpus Loaded"
+
+
+
+
+```{r needed_lines2, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+needed_lines_df$range_minutes <- cut2(needed_lines_df$seconds,g=4)
+
+qq <- qplot(y=percent_line_instances*percent_corpus_used,
+            x=percent_lines_required*percent_corpus_used,
+            data=needed_lines_df,
+            color=factor(range_minutes),
+            size=factor(range_minutes),
+            xlim=c(0,NA),geom=c("point"),
+            ylab="% Lines Loaded",
+            xlab="% Lines Required",
+            main="Efectiveness of Used Lines vs Loaded to Obtain % Word Instances & Time")
+qq 
+
+```
+
+
+
+##### Some Observations
+
+
+
+- Increasing the Number of Loaded Lines from the Corpora significatively increases the processing time
+- If it is required to cover a greater amount of words, more lines might need to be loaded with the consequent penalty on time. 
+- If we are using the Whole Corpora a 0.05 or (5% of the lines seem optimal in time and efficiency)
+
+
+
+### 6. Calculating N-Grams
+
+
+
+Let's create bigrams and trigrams from the Corpora
+
+
+
+```{r ngram_2_3_a, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+all_dat <- rbind(tibble(txt=news_dat),
+                 tibble(txt=blogs_dat),
+                 tibble(txt=twitter_dat))
+
+d_all <- all_dat[sample(1:nrow(all_dat),round(nrow(all_dat)*use_pct,0)),]
+
+d_all %>% clean_text(min_chars=1, filter_stop_words=F) -> d_all_ch1_ff
+
+d_all_ch1_ff %>% 
+    unnest_ngrams(word,txt,n=2) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=20) -> ng2
+
+d_all_ch1_ff %>% 
+    unnest_ngrams(word,txt,n=3) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=20) -> ng3
+
+
+t2<-gvisTable(ng2)
+t3<-gvisTable(ng3)
+plot(gvisMerge(t2,t3,horizontal=TRUE))
+
+
+```
+
+
+What are the top n-gram relationship between the different Corpus ?
+
+
+
+```{r ngram_2_3_b, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+d_news %>% 
+    unnest_ngrams(word,txt,n=2) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng2_news
+
+d_blogs %>% 
+    unnest_ngrams(word,txt,n=2) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng2_blogs
+
+d_twitter %>% 
+    unnest_ngrams(word,txt,n=2) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng2_twitter
+
+d_news %>% 
+    unnest_ngrams(word,txt,n=3) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng3_news
+
+d_blogs %>% 
+    unnest_ngrams(word,txt,n=3) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng3_blogs
+
+d_twitter %>% 
+    unnest_ngrams(word,txt,n=3) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=10) -> ng3_twitter
+
+    names(ng2_news)   <- c("news bigrams"    ,"frequency")
+    names(ng2_blogs)  <- c("blogs bigrams"   ,"frequency")
+    names(ng2_twitter)<- c("twitter bigrams" ,"frequency")
+    names(ng3_news)   <- c("news trigrams"   ,"frequency")
+    names(ng3_blogs)  <- c("blogs trigrams"  ,"frequency")
+    names(ng3_twitter)<- c("twitter trigrams","frequency")
+
+    t2_news<-gvisTable(ng2_news)
+    t2_blogs<-gvisTable(ng2_blogs)
+    t2_twitter<-gvisTable(ng2_twitter)
+    
+    GT2 <- gvisMerge(t2_news,t2_blogs,horizontal=TRUE)
+    GT2b <- gvisMerge(GT2,t2_twitter,horizontal=TRUE)
+    t3_news<-gvisTable(ng3_news)
+    t3_blogs<-gvisTable(ng3_blogs)
+    t3_twitter<-gvisTable(ng3_twitter)
+    GT3 <- gvisMerge(t3_news,t3_blogs,horizontal=TRUE)
+    GT3b <- gvisMerge(GT3,t3_twitter,horizontal=TRUE)
+    
+plot(gvisMerge(GT2b,GT3b,horizontal=FALSE))
+
+
+
+```
+
+
+We can create higher N-grams as well
+
+
+
+```{r ngram5, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE,results='asis',fig.align='center'}
+
+d_all %>% 
+    clean_text(min_chars=1, filter_stop_words=F) %>%
+    unnest_ngrams(word,txt,n=5) %>% 
+    count(word) %>% 
+    arrange(desc(n)) %>% 
+    head(n=20) -> ng5
+
+plot(gvisWordTree(ng5,textvar = "word"))
+
+
+```
+
+
+### 7. Future Steps for the Text Mining Algorithm
+
+
+
+The following steps could be:
+
+
+1. Dictionaries
+
+    - Create dictionaries for top frequency words 
+    - Create 2,3,4-ngrams dictionaries with their frequency.
+    - Use different combinations of  parameters like minimum of characters, cleaning stop words, etc.
+
+2. Prepare Training Set
+
+    - Create a training set sampling random sentences from the Corpora and leaving the last word aside as 'prediction'. Include in the set the correponding n-gram words minus one and their specific frequency as weight.
+    - Create a testing set.
+
+3. Train the model
+
+    - Using the word and n-gram frequency when corresponding to the training set sentences adjust a model that weights those frequencies in order to better predict the last word or n-gram word.
+    - Create a prediction model and study it.
+    
+4. Save dictionaries and weights in files
+
+    - Pay special attention to dictionary sizes, memory for mobile devices, web, etc.
+    - Save dictionaries for each n-gram case and configuration as well as the model weights.
+
+5. Prepare a shiny App
+
+    - Prepare a data folder and include the dictionaries and the model weights
+    - Prepare a ui.R file including a text box where the user can write text. Processed on server.R, return back some buttons or suggestions on what the next 
+    words could be.
+    - Include a button to randomly include sentences when pressed and display the suggested predictions.
+    
+
+### 8. Appendix
+
+
+#### Session infromation for Reproducibility
+
+
+```{r appendix, echo=FALSE,fig.width=14,fig.height=10,warning=FALSE,message=FALSE}
+
+sessionInfo()
+ 
+
+```

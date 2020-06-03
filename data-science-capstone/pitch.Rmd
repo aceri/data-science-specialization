@@ -1,0 +1,91 @@
+---
+title: "Capstone: \nWord Prediction"
+author: "David Pellon"
+date: "30/5/2020"
+output: ioslides_presentation
+---
+
+
+
+```{css echo=FALSE}
+<style>
+slides > slide.title-slide p { color: darkred;}
+slides > slide.title-slide hgroup h1 { color: darkred;}
+slides > slide hgroup h2 { color: darkred;}
+slides > slide hgroup p { color: white;}
+
+</style>
+```    
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# Tasks to accomplish
+# 
+#       Create a slide deck promoting your product. Write 5 slides using RStudio Presenter explaining your product and why it is awesome!
+# Questions to consider
+# 
+#       How can you briefly explain how your predictive model works?
+
+                # Data receives a process of cleaning, random sampling & stemming (to aggregate similar word stems)
+                # Different dictionaries are created based on a combination of 1:4 n-gram using 1-4 minimum word size and removal or not of common stop words
+                # Filtering process based on extremely skewed histogram of repeated words to reduce dictionary size
+                # Matrix of the (1,2,3,4)-gram weights crossed with the 1-gram weights multiplied by the hit [1,0] trained gives a weight of the (1,2,3,4) word to choose next
+
+#       How can you succinctly quantitatively summarize the performance of your prediction algorithm?
+
+                # Correlation of the weighted hit correct hit rate 
+                # predict statistics
+                
+
+#       How can you show the user how the product works?
+                
+                # Captures.
+                # 
+                # ![chart](sdfsdf)
+                
+
+#  TIPS & TRICKS -> https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations
+                
+
+```
+
+## Introduction
+
+These slides are created as a pitch for the final Capstone project on the Data Science Specialization. 
+
+This project creates a word prediction machine learning system based on a given sentence or set of words. 
+
+This process is commonly used in texting applications in the mobile industry to facilitate the typing process to the user. 
+
+With that objective in mind, special care has been given to the portability and size of the dictionaries as well as time and computing process constraints even if doing so reduced its predictive capabilities.
+
+
+Thank you for your interest !.
+
+## Predictive Model {.smaller}
+
+- Working data set undergoes a process of optimized random sampling, cleansing & stemming to aggregate similar word stems and increase n-gram frequency rates and prediction probability.
+- Different dictionaries are created based on a combination of one to four n-gram using one to four minimum word size and removal or not of common stop words. Weights are calculated percentually.
+- Continues a filtering process based on extremely skewed histogram of repeated words to reduce dictionary size. 
+- We create a matrix of the 1/2/3/4-gram percentual weights crossed with the 1-gram percentual weight multiplied by the correct or not hit value.
+- This matrix of weights is trained using random forests and extreme gradient boosting to optimize the weighted hit value to find which dictionary's chosen word is used next.
+
+
+
+## Predictive Algorithm Performance {.smaller}
+
+- While using a single processing flow model of choosing 4-ngram, 3-ngram, 2-ngram, 1-gram has around a 8 % correct rate this predictive model increases this value to XXXX %
+
+
+
+## Usage Example {.smaller}
+
+Example:
+
+
+The application can be tested here:
+
+
+
