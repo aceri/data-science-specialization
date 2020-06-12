@@ -1,7 +1,7 @@
 ---
-title: "Capstone: \nWord Prediction"
+title: "Predicting Next Word"
 author: "David Pellon"
-date: "30/5/2020"
+date: "10/6/2020"
 output: ioslides_presentation
 ---
 
@@ -13,41 +13,16 @@ slides > slide.title-slide p { color: darkred;}
 slides > slide.title-slide hgroup h1 { color: darkred;}
 slides > slide hgroup h2 { color: darkred;}
 slides > slide hgroup p { color: white;}
+slides > slicedemo p { margin-top: -50px;margin-left: -50px }
 
 </style>
 ```    
 
 
-```{r setup, include=FALSE}
+```{r setup,echo=FALSE,message=F,warning=F,cache=TRUE}
 knitr::opts_chunk$set(echo = FALSE)
 
-# Tasks to accomplish
-# 
-#       Create a slide deck promoting your product. Write 5 slides using RStudio Presenter explaining your product and why it is awesome!
-# Questions to consider
-# 
-#       How can you briefly explain how your predictive model works?
 
-                # Data receives a process of cleaning, random sampling & stemming (to aggregate similar word stems)
-                # Different dictionaries are created based on a combination of 1:4 n-gram using 1-4 minimum word size and removal or not of common stop words
-                # Filtering process based on extremely skewed histogram of repeated words to reduce dictionary size
-                # Matrix of the (1,2,3,4)-gram weights crossed with the 1-gram weights multiplied by the hit [1,0] trained gives a weight of the (1,2,3,4) word to choose next
-
-#       How can you succinctly quantitatively summarize the performance of your prediction algorithm?
-
-                # Correlation of the weighted hit correct hit rate 
-                # predict statistics
-                
-
-#       How can you show the user how the product works?
-                
-                # Captures.
-                # 
-                # ![chart](sdfsdf)
-                
-
-#  TIPS & TRICKS -> https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations
-                
 
 ```
 
@@ -61,31 +36,44 @@ This process is commonly used in texting applications in the mobile industry to 
 
 With that objective in mind, special care has been given to the portability and size of the dictionaries as well as time and computing process constraints even if doing so reduced its predictive capabilities.
 
+Still the algorithm performs fairly well with over a 72 % rate of success.
 
-Thank you for your interest !.
+
 
 ## Predictive Model {.smaller}
 
-- Working data set undergoes a process of optimized random sampling, cleansing & stemming to aggregate similar word stems and increase n-gram frequency rates and prediction probability.
-- Different dictionaries are created based on a combination of one to four n-gram using one to four minimum word size and removal or not of common stop words. Weights are calculated percentually.
-- Continues a filtering process based on extremely skewed histogram of repeated words to reduce dictionary size. 
-- We create a matrix of the 1/2/3/4-gram percentual weights crossed with the 1-gram percentual weight multiplied by the correct or not hit value.
-- This matrix of weights is trained using random forests and extreme gradient boosting to optimize the weighted hit value to find which dictionary's chosen word is used next.
+
+- Working data set undergoes a process of optimized random sampling, cleansing & filtering to increase n-gram frequency rates and prediction probability.
+- Filtering process not only removes symbols but also hashtags, email, emoticons, word elongations, numbers, ordinas, etc. 
+- Different dictionaries are created based on a combination of one to 5 n-gram using one to 5 minimum word size and removal or not of common stop words. Weights are calculated percentually.
+- Continues a filtering process based on extremely skewed histogram of repeated words to reduce dictionary size and based on a minimum number of repeating times for each word. 
+- We create a training set from random sentences in the whole corpora. It includes for each given sentence 25 possible solutions with information based on different n-gram percentages 
+    minimum characters per word, part of speech tagging forming a Matrix. 
+- This entire matrix of weights is trained using random forests and extreme gradient boosting to optimize the weighted hit value to find which dictionary's chosen word is used next based on feature importance.
 
 
 
 ## Predictive Algorithm Performance {.smaller}
 
-- While using a single processing flow model of choosing 4-ngram, 3-ngram, 2-ngram, 1-gram has around a 8 % correct rate this predictive model increases this value to XXXX %
-
+- A simple model of choosing 5-ngram, 4-ngram, 3-ngram, 2-ngram, 1-gram initially was providing a 3 % correct rate.
+- After optimization the prediction model reaches a 72 % accuracy rate.
+    - It can recognize and predict nouns from politicians, actors, institutions.
+    - It can predict adult or foul text
+    - It can recognize smilies, some internet slang and perform some level of correction
+    - It does all this in a reduced memory and processing environment that tries to keep stable performing periodic garbage collection.
+    - The datafiles all together sum 39,5 Mb.
+    
+- You can test it here ! -> https://dpellon.shinyapps.io/Capstone
+- Thanks !
 
 
 ## Usage Example {.smaller}
 
-Example:
 
+```{r demo, echo=FALSE,message=F,warning=F,cache=TRUE,fig.align='center'}
+url <- "images/pitch_image_for_demo.gif"
+knitr::include_graphics(url)
 
-The application can be tested here:
-
+```
 
 

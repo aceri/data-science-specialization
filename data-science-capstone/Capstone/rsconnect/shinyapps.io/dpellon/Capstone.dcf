@@ -1,0 +1,12 @@
+name: Capstone
+title: Capstone
+username:
+account: dpellon
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2435284
+bundleId: 3255762
+url: https://dpellon.shinyapps.io/Capstone/
+when: 1591857116.74757
+asMultiple: FALSE
+asStatic: FALSE
