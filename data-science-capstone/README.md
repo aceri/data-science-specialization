@@ -12,8 +12,7 @@ Project creates a word predictor similar to those used in mobile text writers us
 
 ##### Preparing Presentation Slides
 
-##### Final Results
-[You can see the result here](https://dpellon.shinyapps.io/Capstone/)
+##### [Final Results](https://dpellon.shinyapps.io/Capstone/)
 
 
 
