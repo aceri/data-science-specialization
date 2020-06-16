@@ -34,6 +34,9 @@ gc()
 ##############################################################
     require(corpus)
     library(qdapDictionaries)
+    require(udpipe)
+    dl <- "./data/english-ewt-ud-2.4-190531.udpipe"
+    udmodel_english <- udpipe_load_model(dl);rm(dl)
 
     clean_line <- function(line,ret_words=F,use_dictionary=T,dictionary=Grady,correct=T,verbose=0)
     {
@@ -45,7 +48,7 @@ gc()
         line <- replace_contraction(line) ;  
         line <- replace_hash(line) ; 
         line <- replace_rating(line) ; 
-        line <- replace_number(line) ; 
+        line <- replace_number(line, remove=T) ; 
         line <- replace_tag(line) ; 
         line <- replace_word_elongation(line) ; 
         line <- replace_ordinal(line) ; 
@@ -77,6 +80,32 @@ gc()
             }
         }
         return(txt)
+    }   
+    
+    pos_line <- function(line,ret_words = F)
+    {
+        ret = as.data.frame(udpipe_annotate(udmodel_english,x=line,doc_id=seq_along(line)))$upos
+        if (ret_words == F ) ret <- gsub(",","",toString(ret))
+        return(ret)
+    }
+    
+    pos_corpus <- function(text_tibble,verbose=0)
+    {
+        # Needs a tibble of the text with each line being in a column txt
+        txt <- as.data.frame(text_tibble)
+        num_rows=nrow(txt)
+        start <- Sys.time()    
+        for (k in 1:num_rows)
+        {
+            txt[k,1] <- pos_line(line=as.character(txt[k,1]) ,ret_words = F)
+            if(verbose >0 & k %% 100 == 0) 
+            {
+                chck <- Sys.time()
+                diff <- chck-start
+                print(paste("pos_corpus > Processed ",round(k/num_rows*100,2)," % in ",round(diff,0)," s for ",k," lines of ",num_rows," - Time Remaining : ",round((num_rows-k)*diff/k,0)," m = ",round((num_rows-k)*diff/k/3600,2)," h",sep=""))
+            }
+        }
+        return(txt)
     }    
     
     # We create a corpora out of the three files (blog, news and twitter)
@@ -85,24 +114,20 @@ gc()
     full <- rbind(blogs_dat,news_dat,twitter_dat)
     rm(blogs_dat,news_dat,twitter_dat,folder,blogs_str,news_str,twitter_str)
     names(full) <- c("text")
-    # full[sample(1:nrow(full),round(nrow(full),0)*0.1),]  -> full1
-    # full1b1 <- full1[1:200000,]           %>% clean_corpus(use_dictionary=T,correct=T,verbose = 1,dictionary=GradyAugmented)
-    # full1b2 <- full1[300000:400000,]      %>% clean_corpus(use_dictionary=T,correct=T,verbose = 1,dictionary=GradyAugmented)
-    # full1b3 <- full1[400000:600000,]      %>% clean_corpus(use_dictionary=T,correct=T,verbose = 1,dictionary=GradyAugmented)
-    # full1b4 <- full1[600000:nrow(full1),] %>% clean_corpus(use_dictionary=T,correct=T,verbose = 1,dictionary=GradyAugmented)
-    # rm(full)
-    
+
     full[sample(1:nrow(full),round(nrow(full),0)*0.1),] %>% 
         clean_corpus(use_dictionary = T,
                      correct = T, 
                      verbose = 1, 
                      dictionary = GradyAugmented,
                      filename = "full") -> full1
+    
+    full1 <- rbind()    
 
     full <- full1[full1$text!="",]
     rm(full1)
-    saveRDS(fullb,"./data/full.rds")
-    xfull <- corpus_frame("full",full)    
+    saveRDS(full,"./data/full.rds")
+    full <- corpus_frame("full",full)    
     text_filter(full)$map_case <- TRUE
     text_filter(full)$remove_ignorable <- TRUE
     text_filter(full)$drop_punct <- TRUE
@@ -113,7 +138,7 @@ gc()
     #    far fewer part of speech classifications
     
     xfull <- full[sample(1:nrow(full),round(nrow(full)/10,0)),]
-    xfull <- xfull[,-2]
+    xfull <- xfull[c("text")]
     xfull <- pos_corpus(xfull,verbose=1)
     saveRDS(xfull,"./data/xfull.rds")    
     xfull <- corpus_frame("xfull",xfull)
@@ -187,20 +212,218 @@ saveRDS(xng6a,"./data/xng6a.rds")
 
 
 
-full1b <- readRDS("./data/full1b.rds")
-full1b <- corpus_frame("full1b",full1b)    
+################################################################
+#
+#        IN CASE WE NEED TO READ THEM LATER
+#
+################################################################
 
+# full <- readRDS("./data/full.rds")
 
-tr2 <- data.frame(ng=integer(), count=numeric(),
-                 p5=character(),p4=character(),p3=character(),p2=character(),p1=character(),p0=character(),
-                 l5=character(),l4=character(),l3=character(),l2=character(),l1=character(), 
-                 word=character(),solution=character(),stringsAsFactors = F)
+# ng1  <- readRDS("./data/ng1.rds")
+# ng2a <- readRDS("./data/ng2a.rds")
+# ng3a <- readRDS("./data/ng3a.rds")
+# ng4a <- readRDS("./data/ng4a.rds")
+# ng5a <- readRDS("./data/ng5a.rds")
+# ng6a <- readRDS("./data/ng6a.rds")
+# xng1  <- readRDS("./data/xng1.rds")
+# xng2a <- readRDS("./data/xng2a.rds")
+# xng3a <- readRDS("./data/xng3a.rds")
+# xng4a <- readRDS("./data/xng4a.rds")
+# xng5a <- readRDS("./data/xng5a.rds")
+# xng6a <- readRDS("./data/xng6a.rds")
+
 
 
 ################################################################
+#
+# PREPARING A FUNCTION TO GET RANDOM SAMPLES FROM THE CORPORA
+#    (we will use this to get senteces for training matrix)
+#
+################################################################
+
+
+get_random_str <- function(text_tibble,min_words=7,verbose=0,dictionary="")
+{
+    query=""
+    while(query=="") 
+    {
+        dice <- sample(1:max(nrow(text_tibble)),1,replace=T)
+        query_str <- text_tibble$text[dice] %>% clean_line(ret_words=T,verbose=verbose)
+        num_words <- length(query_str)
+        if (num_words >= min_words+1)
+        {
+            minimum_pos <- sample(1:(num_words-min_words),1)
+            minimum_guarantee <- (minimum_pos+min_words-1)
+            if (verbose>2) print(paste("get_random_str > Selecting substring from ",minimum_pos," to ",minimum_guarantee-1,sep=""))
+            query_words <- query_str[minimum_pos:minimum_guarantee-1]
+            query <- gsub(",","",toString(query_words))
+            if (nchar(query_words[length(query_words)])<3) {if (verbose>2) print("get_random_str > rejected because solution word has less than 3 chars"); query=""}
+            if (length(query_words) < min_words) {if (verbose>2) print("get_random_str > rejected because query has less than the minimum required number of words"); query=""}
+            if (sum(query_words %in% dictionary) != min_words) 
+            {
+                if (verbose >2) print(paste("get_random_str > rejected because the words do not conform to dictionary : ",toString(query_words[!query_words %in% dictionary]),sep=""))
+                query=""
+            }
+        } else {
+            if (verbose >2) print(paste("get_random_str > Sentence rejectedas it does not have the minimum number of words",sep=""))
+            query =""
+        }
+    }
+    return(query)
+}
+
+# Testing a few times
+
+for (a in 1:10) {print(get_random_str(full,sample(1:10,1),verbose=0,dictionary = GradyAugmented))}
+
+
+################################################################
+#
+# PREPARING A FUNCTION TO GET RANDOM SAMPLES FROM THE CORPORA
+#    (we will use this to get senteces for training matrix)
+#
+################################################################
+
+pred2 <- function(line,verbose=0, test=F,max_lines=10,ret_lines=5)
+{
+    
+    fill_ng <- function(eval,ng,startj,max_lines)
+    {
+        num_lines <- nrow2(ng)
+        if (num_lines > 0)
+        {
+            sumcount <- sum(ng$count)
+            num_ng <- dim(ng)[2]-1 
+            for (j in (startj+1):(startj + min(max_lines,num_lines)))
+            {
+                this_count <- ng$count[j-startj]
+                this_count_pct <- round(this_count/sumcount*100,2)
+                eval[j,1] = ng[j-startj,dim(ng)[2]-1]  
+                eval[j,2] = num_ng
+                for (y in 3:7)  eval[j,y] = ifelse(num_ng==y-1,this_count,0)
+                for (z in 8:12) eval[j,z] = ifelse(num_ng==z-6,this_count_pct,0)
+            }
+        }
+        return(eval)
+    }
+    
+    eval=""
+    if (line!="")
+    {
+        original_line <- line
+        if(test==T) line=paste(line,"UNKNOWN",sep=" ") 
+        line <- clean_line(line,ret_words=F,verbose=verbose)
+        words <- clean_line(line,ret_words=T,verbose=verbose)
+        if (verbose>1) print(paste("pred2 > Line : ",toString(line),sep=""))
+        pos_words <- pos_line(line,T)
+        num_pos_words <- length(pos_words)
+        num_words <- length(words)
+        solution <- words[num_words]
+        if (verbose>1) print(paste("pred2 > ", paste(toString(words[1:(length(words)-1)]),collapse=" ")," [ ",solution," ]",sep=""))
+        #-----------------------------------------------------------------------------------------------------
+        # PROPOSING WORDS
+        #-----------------------------------------------------------------------------------------------------
+        r_ng2a <- NA; r_ng3a <- NA; r_ng4a <- NA; r_ng5a <- NA; r_ng6a <- NA
+        if(num_words>1) r_ng2a <- ng2a[ng2a$type1==words[num_words-1] ,]    
+        if(num_words>2) r_ng3a <- ng3a[ng3a$type1==words[num_words-2] & ng3a$type2==words[num_words-1] ,]
+        if(num_words>3) r_ng4a <- ng4a[ng4a$type1==words[num_words-3] & ng4a$type2==words[num_words-2] & ng4a$type3==words[num_words-1] ,]
+        if(num_words>4) r_ng5a <- ng5a[ng5a$type1==words[num_words-4] & ng5a$type2==words[num_words-3] & ng5a$type3==words[num_words-2] & ng5a$type4==words[num_words-1] ,]
+        if(num_words>5) r_ng6a <- ng6a[ng6a$type1==words[num_words-5] & ng6a$type2==words[num_words-4] & ng6a$type3==words[num_words-3] & ng6a$type4==words[num_words-2] & ng6a$type5==words[num_words-1] ,]            
+        
+        num_proposed_words = min(max_lines,nrow2(r_ng2a)) + 
+            min(max_lines,nrow2(r_ng3a)) +
+            min(max_lines,nrow2(r_ng4a)) +
+            min(max_lines,nrow2(r_ng5a)) +
+            min(max_lines,nrow2(r_ng6a))
+        
+        eval <- data.frame(word=character(),ng=integer(),w1=numeric(),w2=numeric(),w3=numeric(),
+                           w4=numeric(),w5=numeric(),   pw1=numeric(),pw2=numeric(),pw3=numeric(),
+                           pw4=numeric(),pw5=numeric(), x1=numeric(),x2=numeric(),x3=numeric(),
+                           x4=numeric(),x5=numeric(),  px1=numeric(),px2=numeric(),px3=numeric(),
+                           px4=numeric(),px5=numeric(), rep_word=integer(),rep_pos=integer(),solution=character(),points=numeric(),
+                           stringsAsFactors = F)
+        eval <- fill_ng(eval, ng = r_ng2a, startj = 0, max_lines=max_lines)
+        eval <- fill_ng(eval, ng = r_ng3a, startj = min(max_lines,nrow2(r_ng2a)) , max_lines=max_lines)
+        eval <- fill_ng(eval, ng = r_ng4a, startj = min(max_lines,nrow2(r_ng2a)) + 
+                            min(max_lines,nrow2(r_ng3a)) , max_lines=max_lines)
+        eval <- fill_ng(eval, ng = r_ng5a, startj = min(max_lines,nrow2(r_ng2a)) + 
+                            min(max_lines,nrow2(r_ng3a)) + 
+                            min(max_lines,nrow2(r_ng4a)) , max_lines=max_lines)
+        eval <- fill_ng(eval, ng = r_ng6a, startj = min(max_lines,nrow2(r_ng2a)) + 
+                            min(max_lines,nrow2(r_ng3a)) +
+                            min(max_lines,nrow2(r_ng4a)) + 
+                            min(max_lines,nrow2(r_ng5a)) , max_lines=max_lines)
+        if (num_proposed_words>0)
+        {
+            for (k in 1:num_proposed_words)
+            {
+                pos_sol <- tolower(pos_line(eval[k,1]))
+                
+                v1 = xng1$count[  xng1$type1 == pos_sol]
+                v2 = ifelse(num_pos_words>1,xng2a$count[xng2a$type1 == pos_words[num_pos_words-1] & 
+                                                            xng2a$type2 == pos_sol ],0)
+                v3 = ifelse(num_pos_words>2,xng3a$count[xng3a$type1 == pos_words[num_pos_words-2] & 
+                                                            xng3a$type2 == pos_words[num_pos_words-1] & 
+                                                            xng3a$type3 == pos_sol ],0)
+                v4 = ifelse(num_pos_words>3,xng4a$count[xng4a$type1 == pos_words[num_pos_words-3] & 
+                                                            xng4a$type2 == pos_words[num_pos_words-2] & 
+                                                            xng4a$type3 == pos_words[num_pos_words-1] & 
+                                                            xng4a$type4 == pos_sol ],0)
+                v5 = ifelse(num_pos_words>4,xng5a$count[xng5a$type1 == pos_words[num_pos_words-4] & 
+                                                            xng5a$type2 == pos_words[num_pos_words-3] & 
+                                                            xng5a$type3 == pos_words[num_pos_words-2] & 
+                                                            xng5a$type4 == pos_words[num_pos_words-1] & 
+                                                            xng5a$type5 == pos_sol ],0)
+                v6 = ifelse(pos_sol == pos_words[num_pos_words],-100,0)
+                
+                eval[k,13]  = ifelse(nrow3(v1)==0,0,v1)
+                eval[k,14]  = ifelse(nrow3(v2)==0,0,v2)
+                eval[k,15]  = ifelse(nrow3(v3)==0,0,v3)
+                eval[k,16]  = ifelse(nrow3(v4)==0,0,v4)
+                eval[k,17]  = ifelse(nrow3(v5)==0,0,v5)
+                #-------------------------------------
+                # percentages
+                eval[k,18]  = round(eval[k,13]/sum(xng1$count)*100,2)
+                eval[k,19]  = round(eval[k,14]/sum(xng2a$count)*100,2)
+                eval[k,20]  = round(eval[k,15]/sum(xng3a$count)*100,2)
+                eval[k,21]  = round(eval[k,16]/sum(xng4a$count)*100,2)
+                eval[k,22]  = round(eval[k,17]/sum(xng5a$count)*100,2)
+                #-------------------------------------
+                # repeated word & repeated pos
+                eval[k,23]  = ifelse(eval$word[k] == words[num_words-1],1,0)
+                eval[k,24]  = ifelse(pos_sol == pos_words[num_pos_words-1],1,0)
+                #-------------------------------------                
+                #-------------------------------------                
+                eval[k,25] = solution
+                eval[k,26] = 100*eval[k,8]+43.5*eval[k,3]+25.6*eval[k,14]+22.0*eval[k,15]+17.1*eval[k,13]+15.4*eval[k,16]+13.9*eval[k,17]+
+                    11.2*eval[k,18]+8.7*eval[k,19]+3.92*eval[k,20]+3.84*eval[k,21]+1.95*eval[k,22]+1.66*eval[k,24]
+            }
+            eval <- sqldf("select word,ng,w1,w2,w3,w4,w5,pw1,pw2,pw3,pw4,pw5,x1,x2,x3,x4,x5,px1,px2,px3,px4,px5,rep_word,rep_pos,solution,sum(points) as points from eval group by word order by points desc")
+            eval <- head(eval,ret_lines)
+        }
+    }
+    return(eval)
+}
+
+nrow2 <- function(ng)
+{
+    if (is.null(dim(ng))) ret = 0 else ret = nrow(ng)
+    return(ret)
+}
+
+nrow3 <- function(ng)
+{
+    if (is.null(ng) | is.na(ng)) ret = 0 else ret = max(nrow(ng),length(ng))
+    return(ret)
+}
 
 
 
+pred2(line=get_random_str(full,sample(1:10,1),verbose=3,dictionary=Grady),
+      verbose=3,
+      test=F,
+      ret_lines = 5)
 
 # build_training_set <- function(tr2,iter=500,verbose=0,test=F,save_every=100,dictionary="")
 # {

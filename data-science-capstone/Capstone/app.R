@@ -69,9 +69,6 @@ dl <- "./data/english-ewt-ud-2.4-190531.udpipe"
 udmodel_english <- udpipe_load_model(dl);rm(dl)
 
 
-
-
-
 pos_line <- function(line,ret_words = F)
 {
     ret = tolower(as.data.frame(udpipe_annotate(udmodel_english,x=line,doc_id=seq_along(line)))$upos)
@@ -182,7 +179,7 @@ pred2 <- function(line,verbose=0, test=F,max_lines=100,ret_lines=5)
         {
             for (k in 1:num_proposed_words)
             {
-                pos_sol <- pos_line(eval[k,1])
+                pos_sol <- tolower(pos_line(eval[k,1]))
                 
                 v1 = xng1$count[  xng1$type1 == pos_sol]
                 v2 = ifelse(num_pos_words>1,xng2a$count[xng2a$type1 == pos_words[num_pos_words-1] & 
